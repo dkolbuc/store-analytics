@@ -1,0 +1,167 @@
+/* ================================
+   Store Analytics — Style globalne
+   TODO: Zastąp systemem projektowym (design tokens, CSS variables)
+   ================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg: #0f1117;
+  --color-surface: #1a1d27;
+  --color-border: #2a2d3a;
+  --color-text: #e2e8f0;
+  --color-text-muted: #94a3b8;
+  --color-accent: #6366f1;
+  --color-positive: #22c55e;
+  --color-negative: #ef4444;
+  --color-neutral: #94a3b8;
+
+  --radius: 8px;
+  --gap: 1rem;
+}
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+  padding: var(--gap);
+}
+
+/* Dashboard layout */
+.dashboard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gap);
+  margin-bottom: calc(var(--gap) * 1.5);
+  flex-wrap: wrap;
+}
+
+.toolbar {
+  display: flex;
+  gap: var(--gap);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.dashboard-main {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gap) * 2);
+}
+
+/* KPI grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--gap);
+}
+
+.kpi-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.kpi-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kpi-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.kpi-compare {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.kpi-compare-value {
+  color: var(--color-text-muted);
+}
+
+.kpi-change--positive { color: var(--color-positive); }
+.kpi-change--negative { color: var(--color-negative); }
+.kpi-change--neutral  { color: var(--color-neutral); }
+
+/* Charts */
+.charts-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.ads-chart__canvas {
+  min-height: 200px;
+}
+
+.ads-chart__empty {
+  color: var(--color-text-muted);
+  padding: 2rem 0;
+  text-align: center;
+}
+
+/* AI summary */
+.ai-summary {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.ai-summary__title {
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.ai-summary__placeholder {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* Form controls */
+label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+select {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text);
+  padding: 0.35rem 0.6rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.shop-selector,
+.period-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.period-picker__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}

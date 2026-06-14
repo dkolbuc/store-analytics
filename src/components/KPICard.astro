@@ -1,0 +1,39 @@
+---
+/**
+ * Karta KPI z porównaniem okres-do-okresu.
+ * TODO: Dodać kolorowanie change (zielony wzrost / czerwony spadek)
+ * TODO: Obsłużyć odwrócone metryki (np. bounce rate: spadek jest dobry)
+ */
+
+interface Props {
+  label: string;
+  current: string;
+  compare: string;
+  /** Zmiana procentowa (null = brak danych porównawczych) */
+  change: number | null;
+  unit?: string;
+  /** Czy niższa wartość jest lepsza (np. CPC, zwroty)? */
+  invertedTrend?: boolean;
+}
+
+const { label, current, compare, change, unit, invertedTrend = false } = Astro.props;
+
+// TODO: Oblicz klasę CSS dla change na podstawie wartości i invertedTrend
+const changeClass = "neutral"; // "positive" | "negative" | "neutral"
+---
+
+<div class="kpi-card">
+  <span class="kpi-label">{label}</span>
+  <span class="kpi-value">
+    {current}{unit ? ` ${unit}` : ""}
+  </span>
+  <div class="kpi-compare">
+    <span class="kpi-compare-value">{compare}{unit ? ` ${unit}` : ""}</span>
+    {change !== null && (
+      <span class={`kpi-change kpi-change--${changeClass}`}>
+        {/* TODO: Dodaj strzałkę ↑/↓ i formatowanie */}
+        {change > 0 ? "+" : ""}{change?.toFixed(1)}%
+      </span>
+    )}
+  </div>
+</div>

@@ -1,0 +1,28 @@
+---
+/**
+ * Komponent podsumowania AI (tekst z Gemini).
+ * TODO: Dodać przycisk "Odśwież" wymuszający regenerację (pomijający cache)
+ * TODO: Obsłużyć stan ładowania (skeleton / spinner)
+ */
+
+interface Props {
+  summary: string | null;
+}
+
+const { summary } = Astro.props;
+---
+
+<div class="ai-summary">
+  <h2 class="ai-summary__title">Podsumowanie AI</h2>
+  {summary ? (
+    <div class="ai-summary__content">
+      <!-- TODO: Rozważ renderowanie Markdown jeśli Gemini zwróci MD -->
+      <p>{summary}</p>
+    </div>
+  ) : (
+    <p class="ai-summary__placeholder">
+      <!-- TODO: Zastąp stanem ładowania lub komunikatem o braku danych -->
+      Brak danych do podsumowania.
+    </p>
+  )}
+</div>

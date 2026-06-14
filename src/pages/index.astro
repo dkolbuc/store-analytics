@@ -1,0 +1,99 @@
+---
+/**
+ * Główna strona dashboardu analitycznego.
+ * Stan filtrów (sklep, okres, tryb porównania) pochodzi z parametrów URL:
+ *   ?shop_id=1&period=MoM&anchor=2025-05&compare=previous_period
+ *   lub dla custom: ?period=custom&from=2025-05-01&to=2025-05-31&compare_from=...
+ */
+
+import Layout from "../components/Layout.astro";
+import KPICard from "../components/KPICard.astro";
+import AISummary from "../components/AISummary.astro";
+import ShopSelector from "../islands/ShopSelector";
+import PeriodPicker from "../islands/PeriodPicker";
+import AdsChart from "../islands/AdsChart";
+import { getDB } from "../lib/db.ts";
+import { parsePeriodParams } from "../lib/dates.ts";
+
+// TODO: Odczytaj parametry URL
+// const params = parsePeriodParams(Astro.url.searchParams);
+
+// TODO: Pobierz listę sklepów z bazy (SELECT id, name FROM shops ORDER BY name)
+// const db = getDB(Astro.locals);
+// const shops = await dbAll(db, "SELECT id, name FROM shops ORDER BY name");
+
+// TODO: Pobierz metryki bieżące i porównawcze dla wybranego sklepu i okresu
+// (agregacje z fact_orders, fact_ads_daily, fact_ga4_daily)
+
+// TODO: Wywołaj getOrGenerateSummary dla podsumowania AI
+---
+
+<Layout title="Store Analytics — Dashboard">
+  <header class="dashboard-header">
+    <h1>Store Analytics</h1>
+    <div class="toolbar">
+      <!-- TODO: Przekaż shops i wybrany shopId jako props -->
+      <ShopSelector client:load />
+      <!-- TODO: Przekaż params jako props -->
+      <PeriodPicker client:load />
+    </div>
+  </header>
+
+  <main class="dashboard-main">
+    <!-- Sekcja KPI -->
+    <section class="kpi-grid">
+      <!-- TODO: Przekaż realne wartości z bazy -->
+      <KPICard
+        label="Przychód"
+        current="—"
+        compare="—"
+        change={null}
+        unit="PLN"
+      />
+      <KPICard
+        label="Zamówienia"
+        current="—"
+        compare="—"
+        change={null}
+      />
+      <KPICard
+        label="AOV"
+        current="—"
+        compare="—"
+        change={null}
+        unit="PLN"
+      />
+      <KPICard
+        label="ROAS"
+        current="—"
+        compare="—"
+        change={null}
+      />
+      <KPICard
+        label="Wydatki Ads"
+        current="—"
+        compare="—"
+        change={null}
+        unit="PLN"
+      />
+      <KPICard
+        label="Sesje GA4"
+        current="—"
+        compare="—"
+        change={null}
+      />
+    </section>
+
+    <!-- Sekcja wykresów -->
+    <section class="charts-section">
+      <!-- TODO: Przekaż dane szeregów czasowych jako props -->
+      <AdsChart client:load />
+    </section>
+
+    <!-- Podsumowanie AI -->
+    <section class="ai-section">
+      <!-- TODO: Przekaż wygenerowane podsumowanie lub stan ładowania -->
+      <AISummary summary={null} />
+    </section>
+  </main>
+</Layout>

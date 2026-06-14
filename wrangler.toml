@@ -1,0 +1,22 @@
+name = "store-analytics"
+compatibility_date = "2025-06-14"
+compatibility_flags = ["nodejs_compat"]
+
+# Punkt wejścia generowany przez `astro build` z adapterem Cloudflare
+main = "./.astro/dist/server/index.js"
+
+# Zasoby statyczne (out Astro)
+assets = { directory = "./dist/client", binding = "ASSETS" }
+
+[[d1_databases]]
+binding = "DB"
+database_name = "store-analytics-db"
+database_id = "e96e6770-72a7-4d13-ac70-0686dbbb51d0"
+migrations_dir = "migrations"
+
+[vars]
+# Publiczne zmienne środowiskowe (niesekretne)
+# GEMINI_API_KEY i inne sekrety: wrangler secret put GEMINI_API_KEY
+
+# Lokalne sekrety devowe — utwórz .dev.vars (jest w .gitignore):
+# GEMINI_API_KEY=twój-klucz
