@@ -1,167 +1,593 @@
-/* ================================
-   Store Analytics — Style globalne
-   TODO: Zastąp systemem projektowym (design tokens, CSS variables)
-   ================================ */
+/* ================================================================
+   Store Analytics — style globalne
+   Jasne tło, białe karty, akcent indygo, pl-PL typografia.
+   Klasy muszą dokładnie pokrywać markup generowany przez index.astro
+   i komponenty z src/components/ i src/islands/.
+   ================================================================ */
 
+/* ── Reset i box-sizing ── */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+/* ── Zmienne ── */
 :root {
-  --color-bg: #0f1117;
-  --color-surface: #1a1d27;
-  --color-border: #2a2d3a;
-  --color-text: #e2e8f0;
-  --color-text-muted: #94a3b8;
-  --color-accent: #6366f1;
-  --color-positive: #22c55e;
-  --color-negative: #ef4444;
-  --color-neutral: #94a3b8;
+  --bg:        #f1f5f9;
+  --surface:   #ffffff;
+  --border:    #e2e8f0;
+  --border-2:  #cbd5e1;
+  --text:      #0f172a;
+  --muted:     #64748b;
+  --accent:    #4f46e5;
+  --accent-lt: #eef2ff;
 
-  --radius: 8px;
-  --gap: 1rem;
+  /* Semantyczne kolory delt */
+  --positive:  #059669;   /* wzrost dobrego (przychód, ROAS, sesje) */
+  --negative:  #dc2626;   /* spadek dobrego lub wzrost złego (zwroty, utrata) */
+  --neutral:   #64748b;   /* koszt reklam — bez wartościowania */
+
+  --positive-bg: #d1fae5;
+  --negative-bg: #fee2e2;
+  --neutral-bg:  #f1f5f9;
+
+  --radius:  10px;
+  --radius-s: 6px;
+  --shadow:  0 1px 3px 0 rgb(0 0 0 / .07), 0 1px 2px -1px rgb(0 0 0 / .05);
+  --gap:     1rem;
 }
 
+/* ── Typografia ── */
 body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background: var(--color-bg);
-  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
   min-height: 100vh;
-  padding: var(--gap);
 }
 
-/* Dashboard layout */
-.dashboard-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--gap);
-  margin-bottom: calc(var(--gap) * 1.5);
-  flex-wrap: wrap;
-}
+a { color: var(--accent); text-decoration: none; }
 
-.toolbar {
-  display: flex;
-  gap: var(--gap);
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.dashboard-main {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--gap) * 2);
-}
-
-/* KPI grid */
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: var(--gap);
-}
-
-.kpi-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.kpi-label {
-  font-size: 0.75rem;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.kpi-value {
-  font-size: 1.5rem;
+h2 {
+  font-size: 0.7rem;
   font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  margin-bottom: .75rem;
 }
 
-.kpi-compare {
+code {
+  font-family: ui-monospace, monospace;
+  font-size: .85em;
+  background: var(--border);
+  padding: .1em .35em;
+  border-radius: 3px;
+}
+
+/* ─────────────────────────────────────────────────
+   PASEK STEROWANIA (sticky, przyklejony do góry)
+───────────────────────────────────────────────── */
+.sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8rem;
+  gap: .75rem;
+  flex-wrap: wrap;
+  padding: .55rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow);
 }
 
-.kpi-compare-value {
-  color: var(--color-text-muted);
+.sticky-bar__brand {
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.kpi-change--positive { color: var(--color-positive); }
-.kpi-change--negative { color: var(--color-negative); }
-.kpi-change--neutral  { color: var(--color-neutral); }
-
-/* Charts */
-.charts-section {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 1rem;
+/* ── Selektor sklepu (wyspa React) ── */
+.shop-selector {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
 }
 
-.ads-chart__canvas {
-  min-height: 200px;
+.shop-selector label {
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: .05em;
 }
 
-.ads-chart__empty {
-  color: var(--color-text-muted);
-  padding: 2rem 0;
-  text-align: center;
-}
-
-/* AI summary */
-.ai-summary {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 1rem;
-}
-
-.ai-summary__title {
-  font-size: 1rem;
-  margin-bottom: 0.75rem;
-  color: var(--color-text-muted);
-}
-
-.ai-summary__placeholder {
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
-/* Form controls */
-label {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-}
-
-select {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  color: var(--color-text);
-  padding: 0.35rem 0.6rem;
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.shop-selector,
+/* ── Wybór okresu (wyspa React) ── */
 .period-picker {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: .6rem;
   flex-wrap: wrap;
 }
 
-.period-picker__row {
+.period-group {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: .35rem;
+}
+
+.period-group label {
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+/* ── Formanty HTML ── */
+select,
+input[type="month"],
+input[type="date"],
+input[type="number"] {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-s);
+  color: var(--text);
+  font-family: inherit;
+  font-size: .82rem;
+  padding: .28rem .55rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24'%3E%3Cpath fill='%2364748b' d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right .5rem center;
+  padding-right: 1.6rem;
+}
+
+select:focus,
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgb(79 70 229 / .12);
+}
+
+input[type="number"] { width: 5rem; }
+input[type="month"]  { width: 9rem; }
+input[type="date"]   { width: 8.5rem; }
+
+/* ─────────────────────────────────────────────────
+   PASEK KONTEKSTU (rozwiązane zakresy dat)
+───────────────────────────────────────────────── */
+.context-bar {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .3rem 1rem;
+  font-size: .78rem;
+  color: var(--muted);
+  background: var(--accent-lt);
+  border-bottom: 1px solid var(--border);
+}
+
+.badge-ptd {
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 4px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────────────
+   WRAPPER TREŚCI
+───────────────────────────────────────────────── */
+.page-wrap {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--gap);
+}
+
+/* ─────────────────────────────────────────────────
+   PASEK KPI (4 kafle w rzędzie)
+───────────────────────────────────────────────── */
+.kpi-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--gap);
+  margin: var(--gap) 0;
+}
+
+@media (max-width: 960px)  { .kpi-bar { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px)  { .kpi-bar { grid-template-columns: 1fr; } }
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  padding: 1rem 1.25rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.kpi-card__label {
+  font-size: .68rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+}
+
+.kpi-card__value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.kpi-card__compare {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  font-size: .78rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+.kpi-card__compare-val {
+  color: var(--muted);
+}
+
+/* ─────────────────────────────────────────────────
+   DELTY (kontekstowe kolory)
+   Zielony = wzrost tego, co powinno rosnąć (przychód, ROAS, sesje, konwersje).
+   Czerwony = wzrost tego, co powinno maleć (zwroty, utrata widoczności).
+   Szary  = metryki bez wartościowania kierunku (koszt reklam).
+───────────────────────────────────────────────── */
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: .15rem;
+  font-size: .72rem;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+
+.delta--positive { color: var(--positive); background: var(--positive-bg); }
+.delta--negative { color: var(--negative); background: var(--negative-bg); }
+.delta--neutral  { color: var(--neutral);  background: var(--neutral-bg);  }
+
+/* ─────────────────────────────────────────────────
+   PODSUMOWANIE AI
+───────────────────────────────────────────────── */
+.ai-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  margin-bottom: var(--gap);
+  box-shadow: var(--shadow);
+}
+
+.ai-summary__header {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .75rem;
+}
+
+/* h2 wewnątrz .ai-summary__header ma margin: 0 ustawiony inline */
+.ai-summary__icon {
+  font-size: 1rem;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.ai-summary__content {
+  font-size: .9rem;
+  line-height: 1.75;
+  color: var(--text);
+  white-space: pre-wrap; /* zachowuje podziały akapitów z modelu */
+}
+
+.ai-summary__empty {
+  font-size: .88rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* ─────────────────────────────────────────────────
+   SIATKA KART ANALITYCZNYCH
+───────────────────────────────────────────────── */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--gap);
+}
+
+@media (max-width: 768px) { .cards-grid { grid-template-columns: 1fr; } }
+
+/* Karta zajmująca pełną szerokość */
+.card--full { grid-column: 1 / -1; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+  min-width: 0; /* zapobiega przepełnieniu w grid */
+}
+
+/* ─────────────────────────────────────────────────
+   METRYKI WEWNĄTRZ KART
+───────────────────────────────────────────────── */
+.metrics-row {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: .1rem;
+  min-width: 0;
+}
+
+.metric__label {
+  font-size: .67rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+.metric__value {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.01em;
+}
+
+.metric__compare {
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  font-size: .75rem;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+
+/* ─────────────────────────────────────────────────
+   WYKRESY uPLOT
+───────────────────────────────────────────────── */
+.chart-wrap {
+  margin-top: .75rem;
+  overflow: hidden;
+  width: 100%;
+}
+
+/* uPlot wewnątrz .chart-wrap */
+.chart-wrap .uplot { width: 100% !important; }
+
+.chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  font-size: .85rem;
+  color: var(--muted);
+  font-style: italic;
+  border: 1px dashed var(--border-2);
+  border-radius: var(--radius-s);
+  margin-top: .75rem;
+}
+
+/* Nadpisania stylu uPlot (bez ingerencji w uPlot.min.css) */
+.u-legend {
+  font-size: .72rem !important;
+  margin-top: .25rem !important;
+}
+.u-series > * { padding: 2px 5px !important; }
+
+/* ─────────────────────────────────────────────────
+   UDZIAŁ W WYŚWIETLENIACH ADS (share-bars)
+───────────────────────────────────────────────── */
+.share-bars {
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+  margin-top: .5rem;
+  margin-bottom: .75rem;
+}
+
+.share-bar-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .78rem;
+}
+
+.share-bar-label {
+  flex-shrink: 0;
+  width: 8rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.share-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.share-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  min-width: 2px;
+  transition: width .3s;
+}
+
+.share-bar-fill--won    { background: var(--positive); }
+.share-bar-fill--budget { background: #f59e0b; }   /* amber — utrata budżetowa */
+.share-bar-fill--rank   { background: var(--negative); } /* czerwony — utrata rankingowa */
+
+.share-bar-pct {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: .3rem;
+  min-width: 5.5rem;
+  font-size: .75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─────────────────────────────────────────────────
+   TABELA KANAŁÓW GA4
+───────────────────────────────────────────────── */
+.channel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: .8rem;
+  margin-top: .75rem;
+}
+
+.channel-table th {
+  text-align: left;
+  font-size: .67rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: .3rem .5rem;
+  border-bottom: 2px solid var(--border);
+}
+
+.channel-table td {
+  padding: .32rem .5rem;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+}
+
+.channel-table tr:last-child td { border-bottom: none; }
+
+/* Liczby wyrównane do prawej, tabular */
+.channel-table .num,
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─────────────────────────────────────────────────
+   TOP PRODUKTY
+───────────────────────────────────────────────── */
+.product-row {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr auto;
+  align-items: center;
+  gap: .5rem .75rem;
+  padding: .45rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.product-row:last-child { border-bottom: none; }
+
+.product-rank {
+  font-size: .72rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.product-name {
+  font-size: .84rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+
+.product-bar-wrap {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: .25rem;
+}
+
+.product-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  min-width: 2px;
+}
+
+.product-value {
+  font-size: .82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  flex-shrink: 0;
+}
+
+/* ─────────────────────────────────────────────────
+   STANY BRZEGOWE
+───────────────────────────────────────────────── */
+.no-data {
+  padding: 1.5rem 0;
+  text-align: center;
+  font-size: .85rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.no-shops {
+  text-align: center;
+  padding: 4rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.no-shops h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0;
+  margin-bottom: .5rem;
+}
+
+.no-shops p {
+  color: var(--muted);
+  font-size: .9rem;
+  margin-top: .5rem;
 }

@@ -10,7 +10,7 @@ import { formatROAS } from "./roas.ts";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
-const MAX_OUTPUT_TOKENS = 1_024;
+const MAX_OUTPUT_TOKENS = 2_048;
 
 // ---------------------------------------------------------------------------
 // Typy
@@ -104,31 +104,39 @@ function buildPrompt(input: SummaryInput): string {
   const mainRoas = m.adsCost > 0 ? m.adsConversionsValue / m.adsCost : null;
   const prevRoas = m.prevAdsCost > 0 ? m.prevAdsConversionsValue / m.prevAdsCost : null;
 
-  return `Jesteś analitykiem e-commerce. Napisz zwięzłe podsumowanie wyników sklepu "${shopName}" w języku polskim (3–5 zdań). Podaj liczby, opisz trendy i zasugeruj jeden priorytet działania.
+  // Zmiana procentowa — pomocnik do promptu
+  const chg = (cur: number, prev: number): string => {
+    if (prev === 0) return cur > 0 ? "wzrost z zera" : "bez zmian";
+    const p = ((cur - prev) / Math.abs(prev) * 100).toFixed(1).replace(".", ",");
+    return cur >= prev ? `+${p}%` : `${p}%`;
+  };
 
-Sklep: ${shopName}
+  return `Jesteś analitykiem e-commerce. Napisz DOKŁADNIE 3 krótkie akapity po polsku (łącznie 5–8 zdań) podsumowujące wyniki sklepu "${shopName}". Każdy akapit kończ pełnym zdaniem — nigdy nie urywaj myśli.
+
+Akapit 1 – Sprzedaż: opisz przychód, zamówienia i zwroty; porównaj z poprzednim okresem, podaj zmiany procentowe.
+Akapit 2 – Reklama Google Ads: opisz koszt, ROAS, wartość konwersji; oceń efektywność kampanii.
+Akapit 3 – Ruch i wniosek: skomentuj liczbę sesji, wymień jeden konkretny priorytet działania na następny okres.
+
+Pisz zwięźle, używaj liczb z danych, nie zaczynaj zdań od „Ogólnie" ani „Podsumowując".
+
+DANE — sklep: ${shopName}
 Bieżący okres: ${mainRange.start} – ${mainRange.end}
 Okres porównawczy: ${compareRange.start} – ${compareRange.end}
 
-BIEŻĄCY OKRES:
-- Przychód: ${formatPLN(m.revenue)}
-- Zamówienia: ${m.orders}
-- Zwroty: ${formatPLN(m.refundAmount)}
-- Koszt Google Ads: ${formatPLN(m.adsCost)}
-- Wartość konwersji Ads: ${formatPLN(m.adsConversionsValue)}
-- ROAS: ${formatROAS(mainRoas)}
-- Sesje GA4: ${m.sessions}
+SPRZEDAŻ:
+  Przychód netto:  ${formatPLN(m.revenue)} (poprz. ${formatPLN(m.prevRevenue)}, zmiana: ${chg(m.revenue, m.prevRevenue)})
+  Zamówienia:      ${m.orders} (poprz. ${m.prevOrders}, zmiana: ${chg(m.orders, m.prevOrders)})
+  Zwroty:          ${formatPLN(m.refundAmount)} (poprz. ${formatPLN(m.prevRefundAmount)})
 
-OKRES PORÓWNAWCZY:
-- Przychód: ${formatPLN(m.prevRevenue)}
-- Zamówienia: ${m.prevOrders}
-- Zwroty: ${formatPLN(m.prevRefundAmount)}
-- Koszt Google Ads: ${formatPLN(m.prevAdsCost)}
-- Wartość konwersji Ads: ${formatPLN(m.prevAdsConversionsValue)}
-- ROAS: ${formatROAS(prevRoas)}
-- Sesje GA4: ${m.prevSessions}
+REKLAMA GOOGLE ADS:
+  Koszt:           ${formatPLN(m.adsCost)} (poprz. ${formatPLN(m.prevAdsCost)}, zmiana: ${chg(m.adsCost, m.prevAdsCost)})
+  Wart. konwersji: ${formatPLN(m.adsConversionsValue)} (poprz. ${formatPLN(m.prevAdsConversionsValue)})
+  ROAS:            ${formatROAS(mainRoas)} (poprz. ${formatROAS(prevRoas)})
 
-Podsumowanie:`;
+RUCH GA4:
+  Sesje:           ${m.sessions} (poprz. ${m.prevSessions}, zmiana: ${chg(m.sessions, m.prevSessions)})
+
+Podsumowanie (3 akapity, zakończone pełnym zdaniem):`;
 }
 
 interface GeminiResponse {

@@ -1,17 +1,17 @@
 ---
-interface Props {
-  title: string;
-}
+// Import CSS przez Astro — bundler wstrzykuje <link> do <head> automatycznie.
+// Nie używaj ścieżki /styles/global.css jako publicznego URL-a (plik jest w src/, nie public/).
+import "../styles/global.css";
+
+interface Props { title: string; }
 const { title } = Astro.props;
 ---
-
 <!doctype html>
 <html lang="pl">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{title}</title>
-    <link rel="stylesheet" href="/styles/global.css" />
   </head>
   <body>
     <slot />

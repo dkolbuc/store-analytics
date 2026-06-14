@@ -2,11 +2,11 @@ import { useEffect, useRef } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 
-export interface DailyAdsPoint { date: string; cost: number; conversionsValue: number; }
+export interface DailyPoint { date: string; value: number; }
 
 interface Props {
-  mainData: DailyAdsPoint[];
-  compareData: DailyAdsPoint[];
+  mainData: DailyPoint[];
+  compareData: DailyPoint[];
   mainRange: { start: string; end: string };
   compareRange: { start: string; end: string };
 }
@@ -24,18 +24,28 @@ function generateDates(start: string, end: string): string[] {
   return out;
 }
 
+function toSeries(data: DailyPoint[], dates: string[]): (number | null)[] {
+  const m = new Map(data.map((d) => [d.date, d.value]));
+  return dates.map((d) => m.get(d) ?? null);
+}
+
 function yFmt(_u: uPlot, vals: number[]): string[] {
   return vals.map((v) => {
     if (v == null) return "";
+    if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
     if (v >= 1_000) return `${(v / 1_000).toFixed(0)}k`;
     return v.toFixed(0);
   });
 }
+
 function xFmt(_u: uPlot, vals: number[]): string[] {
-  return vals.map((v) => { const d = new Date(v * 1000); return `${d.getUTCDate()}.${d.getUTCMonth() + 1}`; });
+  return vals.map((v) => {
+    const d = new Date(v * 1000);
+    return `${d.getUTCDate()}.${d.getUTCMonth() + 1}`;
+  });
 }
 
-export default function AdsChart({ mainData, compareData, mainRange, compareRange }: Props) {
+export default function SalesChart({ mainData, compareData, mainRange, compareRange }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const uRef = useRef<uPlot | null>(null);
 
@@ -44,23 +54,20 @@ export default function AdsChart({ mainData, compareData, mainRange, compareRang
 
     const mainDates = generateDates(mainRange.start, mainRange.end);
     const cmpDates  = generateDates(compareRange.start, compareRange.end);
-    const xs = mainDates.map((d) => parseDateUTC(d).getTime() / 1000);
-
-    const mMap = new Map(mainData.map((d) => [d.date, d]));
-    const cMap = new Map(compareData.map((d) => [d.date, d]));
-
-    const costMain    = mainDates.map((d) => mMap.get(d)?.cost ?? null);
-    const convMain    = mainDates.map((d) => mMap.get(d)?.conversionsValue ?? null);
-    const costCmp     = mainDates.map((_, i) => { const cd = cmpDates[i]; return cd ? (cMap.get(cd)?.cost ?? null) : null; });
+    const xs        = mainDates.map((d) => parseDateUTC(d).getTime() / 1000);
+    const mainVals  = toSeries(mainData, mainDates);
+    const cmpVals   = mainDates.map((_, i) => {
+      const cd = cmpDates[i];
+      return cd ? (compareData.find((d) => d.date === cd)?.value ?? null) : null;
+    });
 
     const width = ref.current.offsetWidth || 560;
     const opts: uPlot.Options = {
       width, height: 200,
       series: [
         {},
-        { label: "Koszt (bież.)", stroke: "#64748b", width: 2, dash: [3, 3] },
-        { label: "Wart. konwersji", stroke: "#4f46e5", width: 2 },
-        { label: "Koszt (poprz.)", stroke: "#cbd5e1", width: 1.5, dash: [4, 4] },
+        { label: "Bieżący", stroke: "#4f46e5", width: 2 },
+        { label: "Poprzedni", stroke: "#94a3b8", width: 1.5, dash: [4, 4] },
       ],
       axes: [{ values: xFmt }, { values: yFmt, size: 58 }],
       cursor: { drag: { x: false, y: false } },
@@ -68,7 +75,7 @@ export default function AdsChart({ mainData, compareData, mainRange, compareRang
     };
 
     uRef.current?.destroy();
-    uRef.current = new uPlot(opts, [xs, costMain, convMain, costCmp] as uPlot.AlignedData, ref.current);
+    uRef.current = new uPlot(opts, [xs, mainVals, cmpVals] as uPlot.AlignedData, ref.current);
 
     const ro = new ResizeObserver(() => {
       if (ref.current) uRef.current?.setSize({ width: ref.current.offsetWidth, height: 200 });
@@ -78,7 +85,7 @@ export default function AdsChart({ mainData, compareData, mainRange, compareRang
   }, [JSON.stringify(mainData), JSON.stringify(compareData), mainRange.start, compareRange.start]);
 
   if (!mainData.length && !compareData.length)
-    return <div className="chart-empty">Brak danych reklamowych.</div>;
+    return <div className="chart-empty">Brak danych sprzedażowych.</div>;
 
   return <div ref={ref} className="chart-wrap" />;
 }

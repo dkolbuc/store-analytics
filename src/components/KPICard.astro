@@ -1,39 +1,28 @@
 ---
-/**
- * Karta KPI z porównaniem okres-do-okresu.
- * TODO: Dodać kolorowanie change (zielony wzrost / czerwony spadek)
- * TODO: Obsłużyć odwrócone metryki (np. bounce rate: spadek jest dobry)
- */
+import { deltaClass, fmtDelta, deltaArrow } from "../lib/delta.ts";
 
 interface Props {
   label: string;
   current: string;
   compare: string;
-  /** Zmiana procentowa (null = brak danych porównawczych) */
   change: number | null;
-  unit?: string;
-  /** Czy niższa wartość jest lepsza (np. CPC, zwroty)? */
-  invertedTrend?: boolean;
+  /** Klucz metryki do ustalenia semantyki koloru (revenue, cost, roas, …) */
+  metricKey: string;
 }
 
-const { label, current, compare, change, unit, invertedTrend = false } = Astro.props;
-
-// TODO: Oblicz klasę CSS dla change na podstawie wartości i invertedTrend
-const changeClass = "neutral"; // "positive" | "negative" | "neutral"
+const { label, current, compare, change, metricKey } = Astro.props;
+const cls = deltaClass(metricKey, change);
+const arrow = deltaArrow(change);
+const delta = fmtDelta(change);
 ---
 
 <div class="kpi-card">
-  <span class="kpi-label">{label}</span>
-  <span class="kpi-value">
-    {current}{unit ? ` ${unit}` : ""}
-  </span>
-  <div class="kpi-compare">
-    <span class="kpi-compare-value">{compare}{unit ? ` ${unit}` : ""}</span>
+  <div class="kpi-card__label">{label}</div>
+  <div class="kpi-card__value">{current}</div>
+  <div class="kpi-card__compare">
+    <span class="kpi-card__compare-val">vs {compare}</span>
     {change !== null && (
-      <span class={`kpi-change kpi-change--${changeClass}`}>
-        {/* TODO: Dodaj strzałkę ↑/↓ i formatowanie */}
-        {change > 0 ? "+" : ""}{change?.toFixed(1)}%
-      </span>
+      <span class={`delta ${cls}`}>{arrow} {delta}</span>
     )}
   </div>
 </div>

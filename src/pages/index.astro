@@ -1,99 +1,497 @@
 ---
-/**
- * Główna strona dashboardu analitycznego.
- * Stan filtrów (sklep, okres, tryb porównania) pochodzi z parametrów URL:
- *   ?shop_id=1&period=MoM&anchor=2025-05&compare=previous_period
- *   lub dla custom: ?period=custom&from=2025-05-01&to=2025-05-31&compare_from=...
- */
-
 import Layout from "../components/Layout.astro";
 import KPICard from "../components/KPICard.astro";
 import AISummary from "../components/AISummary.astro";
 import ShopSelector from "../islands/ShopSelector";
 import PeriodPicker from "../islands/PeriodPicker";
+import SalesChart from "../islands/SalesChart";
 import AdsChart from "../islands/AdsChart";
-import { getDB } from "../lib/db.ts";
-import { parsePeriodParams } from "../lib/dates.ts";
+import Ga4Chart from "../islands/Ga4Chart";
 
-// TODO: Odczytaj parametry URL
-// const params = parsePeriodParams(Astro.url.searchParams);
+import { getDB, dbAll } from "../lib/db.ts";
+import {
+  parsePeriodParams, resolvePeriods, todayWarsaw, formatPeriodLabel, percentChange,
+} from "../lib/dates.ts";
+import { formatPLN, formatPLNShort, groszeToPLN } from "../lib/money.ts";
+import { calcROAS, formatROAS, calcCPC, calcCTR } from "../lib/roas.ts";
+import { getOrGenerateSummary } from "../lib/gemini.ts";
+import { deltaClass, fmtDelta, deltaArrow } from "../lib/delta.ts";
+import {
+  querySales, queryAds, queryGA4, queryTopProducts,
+  querySalesDaily, queryAdsDaily, queryGA4Daily,
+  ZERO_SALES, ZERO_ADS, ZERO_GA4,
+  type SalesMetrics, type AdsMetrics, type GA4Metrics,
+  type DailyPoint, type DailyAdsPoint, type TopProduct,
+} from "../lib/queries.ts";
 
-// TODO: Pobierz listę sklepów z bazy (SELECT id, name FROM shops ORDER BY name)
-// const db = getDB(Astro.locals);
-// const shops = await dbAll(db, "SELECT id, name FROM shops ORDER BY name");
+// ---------------------------------------------------------------------------
+// 1. Parametry URL i rozwiązanie okresów
+// ---------------------------------------------------------------------------
 
-// TODO: Pobierz metryki bieżące i porównawcze dla wybranego sklepu i okresu
-// (agregacje z fact_orders, fact_ads_daily, fact_ga4_daily)
+const db = getDB(Astro.locals);
+const today = todayWarsaw();
+const params = parsePeriodParams(Astro.url.searchParams);
+const { main: mainRange, compare: compareRange } = resolvePeriods(params, today);
 
-// TODO: Wywołaj getOrGenerateSummary dla podsumowania AI
+// Czy bieżący okres jest w toku (period-to-date)?
+const isInProgress = params.type !== "custom" && mainRange.end === today;
+
+// Etykiety kontekstowe
+const mainLabel    = formatPeriodLabel(mainRange, params.type);
+const compareLabel = formatPeriodLabel(compareRange, params.type);
+
+// ---------------------------------------------------------------------------
+// 2. Lista sklepów i wybrany sklep
+// ---------------------------------------------------------------------------
+
+interface ShopRow { shop_id: string; name: string; data_version: number; }
+
+let shops: ShopRow[] = [];
+try {
+  shops = await dbAll<ShopRow>(
+    db,
+    "SELECT shop_id, name, data_version FROM shops WHERE active = 1 ORDER BY name"
+  );
+} catch { /* pusta lista przy braku tabeli */ }
+
+const selectedShopId = Astro.url.searchParams.get("shop") ?? shops[0]?.shop_id ?? "";
+const selectedShop   = shops.find((s) => s.shop_id === selectedShopId);
+
+// ---------------------------------------------------------------------------
+// 3. Agregacje D1 (graceful degradation)
+// ---------------------------------------------------------------------------
+
+let mainSales: SalesMetrics   = ZERO_SALES;
+let cmpSales:  SalesMetrics   = ZERO_SALES;
+let mainAds:   AdsMetrics     = ZERO_ADS;
+let cmpAds:    AdsMetrics     = ZERO_ADS;
+let mainGA4:   GA4Metrics     = ZERO_GA4;
+let cmpGA4:    GA4Metrics     = ZERO_GA4;
+let topProducts: TopProduct[] = [];
+let mainSalesDaily:  DailyPoint[]    = [];
+let cmpSalesDaily:   DailyPoint[]    = [];
+let mainAdsDaily:    DailyAdsPoint[] = [];
+let cmpAdsDaily:     DailyAdsPoint[] = [];
+let mainGA4Daily:    DailyPoint[]    = [];
+let cmpGA4Daily:     DailyPoint[]    = [];
+
+if (selectedShopId) {
+  try {
+    [
+      mainSales, cmpSales, mainAds, cmpAds, mainGA4, cmpGA4, topProducts,
+      mainSalesDaily, cmpSalesDaily, mainAdsDaily, cmpAdsDaily, mainGA4Daily, cmpGA4Daily,
+    ] = await Promise.all([
+      querySales(db, selectedShopId, mainRange),
+      querySales(db, selectedShopId, compareRange),
+      queryAds(db, selectedShopId, mainRange),
+      queryAds(db, selectedShopId, compareRange),
+      queryGA4(db, selectedShopId, mainRange),
+      queryGA4(db, selectedShopId, compareRange),
+      queryTopProducts(db, selectedShopId, mainRange),
+      querySalesDaily(db, selectedShopId, mainRange),
+      querySalesDaily(db, selectedShopId, compareRange),
+      queryAdsDaily(db, selectedShopId, mainRange),
+      queryAdsDaily(db, selectedShopId, compareRange),
+      queryGA4Daily(db, selectedShopId, mainRange),
+      queryGA4Daily(db, selectedShopId, compareRange),
+    ]);
+  } catch (e) {
+    console.error("Błąd zapytań D1:", e);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4. Metryki pochodne i delty
+// ---------------------------------------------------------------------------
+
+const mainROAS = calcROAS(mainAds.conversionsValue, mainAds.cost);
+const cmpROAS  = calcROAS(cmpAds.conversionsValue, cmpAds.cost);
+const mainCPC  = calcCPC(mainAds.cost, mainAds.clicks);
+const mainCTR  = calcCTR(mainAds.clicks, mainAds.impressions);
+
+// Procentowe delty
+const dRevenue     = percentChange(mainSales.revenue, cmpSales.revenue);
+const dOrders      = percentChange(mainSales.orders, cmpSales.orders);
+const dAOV         = percentChange(mainSales.aov, cmpSales.aov);
+const dRefunds     = percentChange(mainSales.refunds, cmpSales.refunds);
+const dCost        = percentChange(mainAds.cost, cmpAds.cost);
+const dConvValue   = percentChange(mainAds.conversionsValue, cmpAds.conversionsValue);
+const dConv        = percentChange(mainAds.conversions, cmpAds.conversions);
+const dROAS        = cmpROAS !== null && mainROAS !== null
+  ? percentChange(mainROAS, cmpROAS) : null;
+const dSessions    = percentChange(mainGA4.sessions, cmpGA4.sessions);
+const dEngaged     = percentChange(mainGA4.engagedSessions, cmpGA4.engagedSessions);
+const dKeyEvents   = percentChange(mainGA4.keyEvents, cmpGA4.keyEvents);
+const dImprShare   = mainAds.impressionShare !== null && cmpAds.impressionShare !== null
+  ? percentChange(mainAds.impressionShare, cmpAds.impressionShare) : null;
+
+// ---------------------------------------------------------------------------
+// 5. Dane wykresów (konwersja grosze → PLN dla wykresów)
+// ---------------------------------------------------------------------------
+
+const mainSalesPLN: DailyPoint[] = mainSalesDaily.map((d) => ({ date: d.date, value: groszeToPLN(d.value) }));
+const cmpSalesPLN:  DailyPoint[] = cmpSalesDaily.map((d)  => ({ date: d.date, value: groszeToPLN(d.value) }));
+const mainAdsPLN: DailyAdsPoint[] = mainAdsDaily.map((d)  => ({ date: d.date, cost: groszeToPLN(d.cost), conversionsValue: groszeToPLN(d.conversionsValue) }));
+const cmpAdsPLN:  DailyAdsPoint[] = cmpAdsDaily.map((d)   => ({ date: d.date, cost: groszeToPLN(d.cost), conversionsValue: groszeToPLN(d.conversionsValue) }));
+
+// ---------------------------------------------------------------------------
+// 6. Podsumowanie AI (graceful degradation)
+// ---------------------------------------------------------------------------
+
+let aiSummary: string | null = null;
+try {
+  const apiKey = Astro.locals.runtime.env.GEMINI_API_KEY;
+  if (apiKey && selectedShopId && selectedShop) {
+    aiSummary = await getOrGenerateSummary(db, {
+      shopId:       selectedShopId,
+      shopName:     selectedShop.name,
+      mainRange,
+      compareRange,
+      dataVersion:  selectedShop.data_version,
+      metrics: {
+        revenue:              mainSales.revenue,
+        orders:               mainSales.orders,
+        refundAmount:         mainSales.refunds,
+        adsCost:              mainAds.cost,
+        adsConversionsValue:  mainAds.conversionsValue,
+        sessions:             mainGA4.sessions,
+        prevRevenue:          cmpSales.revenue,
+        prevOrders:           cmpSales.orders,
+        prevRefundAmount:     cmpSales.refunds,
+        prevAdsCost:          cmpAds.cost,
+        prevAdsConversionsValue: cmpAds.conversionsValue,
+        prevSessions:         cmpGA4.sessions,
+      },
+    }, apiKey);
+  }
+} catch { /* cicha degradacja */ }
+
+// ---------------------------------------------------------------------------
+// Pomocnicy wyświetlania
+// ---------------------------------------------------------------------------
+
+function pct(val: number | null) {
+  return val !== null ? `${(val * 100).toFixed(1)}%` : "—";
+}
+
+function deltaSpan(key: string, change: number | null) {
+  const cls   = deltaClass(key, change);
+  const arrow = deltaArrow(change);
+  const val   = fmtDelta(change);
+  return change !== null
+    ? `<span class="delta ${cls}">${arrow} ${val}</span>`
+    : `<span class="delta delta--neutral">—</span>`;
+}
+
+const topMax = topProducts[0]?.value ?? 1;
 ---
 
-<Layout title="Store Analytics — Dashboard">
-  <header class="dashboard-header">
-    <h1>Store Analytics</h1>
-    <div class="toolbar">
-      <!-- TODO: Przekaż shops i wybrany shopId jako props -->
-      <ShopSelector client:load />
-      <!-- TODO: Przekaż params jako props -->
-      <PeriodPicker client:load />
-    </div>
-  </header>
+<Layout title={`${selectedShop?.name ?? "Dashboard"} — Store Analytics`}>
 
-  <main class="dashboard-main">
-    <!-- Sekcja KPI -->
-    <section class="kpi-grid">
-      <!-- TODO: Przekaż realne wartości z bazy -->
-      <KPICard
-        label="Przychód"
-        current="—"
-        compare="—"
-        change={null}
-        unit="PLN"
-      />
-      <KPICard
-        label="Zamówienia"
-        current="—"
-        compare="—"
-        change={null}
-      />
-      <KPICard
-        label="AOV"
-        current="—"
-        compare="—"
-        change={null}
-        unit="PLN"
-      />
-      <KPICard
-        label="ROAS"
-        current="—"
-        compare="—"
-        change={null}
-      />
-      <KPICard
-        label="Wydatki Ads"
-        current="—"
-        compare="—"
-        change={null}
-        unit="PLN"
-      />
-      <KPICard
-        label="Sesje GA4"
-        current="—"
-        compare="—"
-        change={null}
-      />
-    </section>
+  <!-- ──────────────────── Pasek sterowania ──────────────────── -->
+  <div class="sticky-bar">
+    <span class="sticky-bar__brand">Store Analytics</span>
+    {shops.length > 0 && (
+      <ShopSelector client:load shops={shops} current={selectedShopId} />
+    )}
+    <PeriodPicker
+      client:load
+      type={params.type}
+      anchor={params.anchor}
+      compare={params.compare}
+      customFrom={params.customMain?.start ?? ""}
+      customTo={params.customMain?.end ?? ""}
+      compareFrom={params.customCompare?.start ?? ""}
+      compareTo={params.customCompare?.end ?? ""}
+    />
+  </div>
 
-    <!-- Sekcja wykresów -->
-    <section class="charts-section">
-      <!-- TODO: Przekaż dane szeregów czasowych jako props -->
-      <AdsChart client:load />
-    </section>
+  <!-- Pasek kontekstu -->
+  <div class="context-bar">
+    {isInProgress && <span class="badge-ptd">W toku</span>}
+    <span>{mainLabel}</span>
+    <span style="color:var(--border-2)">vs</span>
+    <span>{compareLabel}</span>
+  </div>
 
-    <!-- Podsumowanie AI -->
-    <section class="ai-section">
-      <!-- TODO: Przekaż wygenerowane podsumowanie lub stan ładowania -->
-      <AISummary summary={null} />
-    </section>
-  </main>
+  <!-- ──────────────────── Zawartość ──────────────────── -->
+  <div class="page-wrap">
+
+    {shops.length === 0 ? (
+      <div class="no-shops">
+        <h2>Brak sklepów</h2>
+        <p>Dodaj wiersz do tabeli <code>shops</code> i przeładuj stronę.</p>
+      </div>
+    ) : (
+      <>
+
+        <!-- ── Pasek KPI ── -->
+        <div class="kpi-bar">
+          <KPICard
+            label="Przychód netto"
+            current={formatPLNShort(mainSales.revenue)}
+            compare={formatPLNShort(cmpSales.revenue)}
+            change={dRevenue}
+            metricKey="revenue"
+          />
+          <KPICard
+            label="Wydatki reklamowe"
+            current={formatPLNShort(mainAds.cost)}
+            compare={formatPLNShort(cmpAds.cost)}
+            change={dCost}
+            metricKey="cost"
+          />
+          <KPICard
+            label="ROAS"
+            current={formatROAS(mainROAS)}
+            compare={formatROAS(cmpROAS)}
+            change={dROAS}
+            metricKey="roas"
+          />
+          <KPICard
+            label="Zamówienia"
+            current={String(mainSales.orders)}
+            compare={String(cmpSales.orders)}
+            change={dOrders}
+            metricKey="orders"
+          />
+        </div>
+
+        <!-- ── Podsumowanie AI ── -->
+        <AISummary summary={aiSummary} />
+
+        <!-- ── Siatka kart ── -->
+        <div class="cards-grid">
+
+          <!-- KARTA: Sprzedaż -->
+          <div class="card">
+            <h2>Sprzedaż</h2>
+            <div class="metrics-row">
+              <div class="metric">
+                <span class="metric__label">Przychód netto</span>
+                <span class="metric__value">{formatPLN(mainSales.revenue)}</span>
+                <div class="metric__compare">
+                  <span>{formatPLN(cmpSales.revenue)}</span>
+                  <Fragment set:html={deltaSpan("revenue", dRevenue)} />
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric__label">Zamówienia</span>
+                <span class="metric__value">{mainSales.orders}</span>
+                <div class="metric__compare">
+                  <span>{cmpSales.orders}</span>
+                  <Fragment set:html={deltaSpan("orders", dOrders)} />
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric__label">Śr. wartość zamów.</span>
+                <span class="metric__value">{formatPLN(mainSales.aov)}</span>
+                <div class="metric__compare">
+                  <span>{formatPLN(cmpSales.aov)}</span>
+                  <Fragment set:html={deltaSpan("aov", dAOV)} />
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric__label">Zwroty</span>
+                <span class="metric__value">{formatPLNShort(mainSales.refunds)}</span>
+                <div class="metric__compare">
+                  <span>{formatPLNShort(cmpSales.refunds)}</span>
+                  <Fragment set:html={deltaSpan("refunds", dRefunds)} />
+                </div>
+              </div>
+            </div>
+            <SalesChart
+              client:load
+              mainData={mainSalesPLN}
+              compareData={cmpSalesPLN}
+              mainRange={mainRange}
+              compareRange={compareRange}
+            />
+          </div>
+
+          <!-- KARTA: Reklama -->
+          <div class="card">
+            <h2>Google Ads</h2>
+            <div class="metrics-row">
+              <div class="metric">
+                <span class="metric__label">Koszt</span>
+                <span class="metric__value">{formatPLN(mainAds.cost)}</span>
+                <div class="metric__compare">
+                  <span>{formatPLN(cmpAds.cost)}</span>
+                  <Fragment set:html={deltaSpan("cost", dCost)} />
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric__label">Wart. konwersji</span>
+                <span class="metric__value">{formatPLNShort(mainAds.conversionsValue)}</span>
+                <div class="metric__compare">
+                  <span>{formatPLNShort(cmpAds.conversionsValue)}</span>
+                  <Fragment set:html={deltaSpan("conversions", dConvValue)} />
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric__label">ROAS</span>
+                <span class="metric__value">{formatROAS(mainROAS)}</span>
+                <div class="metric__compare">
+                  <span>{formatROAS(cmpROAS)}</span>
+                  <Fragment set:html={deltaSpan("roas", dROAS)} />
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric__label">CPC</span>
+                <span class="metric__value">{mainCPC !== null ? formatPLN(Math.round(mainCPC)) : "—"}</span>
+              </div>
+              <div class="metric">
+                <span class="metric__label">CTR</span>
+                <span class="metric__value">{mainCTR !== null ? `${mainCTR.toFixed(2).replace(".", ",")}%` : "—"}</span>
+              </div>
+              <div class="metric">
+                <span class="metric__label">Konwersje</span>
+                <span class="metric__value">{mainAds.conversions.toFixed(0)}</span>
+                <div class="metric__compare">
+                  <span>{cmpAds.conversions.toFixed(0)}</span>
+                  <Fragment set:html={deltaSpan("conversions", dConv)} />
+                </div>
+              </div>
+            </div>
+
+            {/* Udział w wyświetleniach */}
+            {mainAds.impressionShare !== null && (
+              <div class="share-bars">
+                <div class="share-bar-row">
+                  <span class="share-bar-label">Udział (wygrany)</span>
+                  <div class="share-bar-track">
+                    <div class="share-bar-fill share-bar-fill--won"
+                         style={`width:${(mainAds.impressionShare * 100).toFixed(0)}%`}></div>
+                  </div>
+                  <span class="share-bar-pct">
+                    {pct(mainAds.impressionShare)}
+                    <Fragment set:html={" "} />
+                    <Fragment set:html={deltaSpan("impression_share", dImprShare)} />
+                  </span>
+                </div>
+                {mainAds.budgetLostShare !== null && (
+                  <div class="share-bar-row">
+                    <span class="share-bar-label">Utrata (budżet)</span>
+                    <div class="share-bar-track">
+                      <div class="share-bar-fill share-bar-fill--budget"
+                           style={`width:${(mainAds.budgetLostShare * 100).toFixed(0)}%`}></div>
+                    </div>
+                    <span class="share-bar-pct">{pct(mainAds.budgetLostShare)}</span>
+                  </div>
+                )}
+                {mainAds.rankLostShare !== null && (
+                  <div class="share-bar-row">
+                    <span class="share-bar-label">Utrata (ranking)</span>
+                    <div class="share-bar-track">
+                      <div class="share-bar-fill share-bar-fill--rank"
+                           style={`width:${(mainAds.rankLostShare * 100).toFixed(0)}%`}></div>
+                    </div>
+                    <span class="share-bar-pct">{pct(mainAds.rankLostShare)}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <AdsChart
+              client:load
+              mainData={mainAdsPLN}
+              compareData={cmpAdsPLN}
+              mainRange={mainRange}
+              compareRange={compareRange}
+            />
+          </div>
+
+          <!-- KARTA: Ruch GA4 -->
+          <div class="card">
+            <h2>Ruch (GA4)</h2>
+            <div class="metrics-row">
+              <div class="metric">
+                <span class="metric__label">Sesje</span>
+                <span class="metric__value">{mainGA4.sessions.toLocaleString("pl-PL")}</span>
+                <div class="metric__compare">
+                  <span>{cmpGA4.sessions.toLocaleString("pl-PL")}</span>
+                  <Fragment set:html={deltaSpan("sessions", dSessions)} />
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric__label">Zaangażow.</span>
+                <span class="metric__value">{mainGA4.engagedSessions.toLocaleString("pl-PL")}</span>
+                <div class="metric__compare">
+                  <span>{cmpGA4.engagedSessions.toLocaleString("pl-PL")}</span>
+                  <Fragment set:html={deltaSpan("engaged_sessions", dEngaged)} />
+                </div>
+              </div>
+              <div class="metric">
+                <span class="metric__label">Wsk. zaangażow.</span>
+                <span class="metric__value">{mainGA4.engagementRate.toFixed(1).replace(".", ",")}%</span>
+              </div>
+              <div class="metric">
+                <span class="metric__label">Zdarzenia kluczowe</span>
+                <span class="metric__value">{mainGA4.keyEvents.toLocaleString("pl-PL")}</span>
+                <div class="metric__compare">
+                  <span>{cmpGA4.keyEvents.toLocaleString("pl-PL")}</span>
+                  <Fragment set:html={deltaSpan("key_events", dKeyEvents)} />
+                </div>
+              </div>
+            </div>
+            <Ga4Chart
+              client:load
+              mainData={mainGA4Daily}
+              compareData={cmpGA4Daily}
+              mainRange={mainRange}
+              compareRange={compareRange}
+            />
+            {mainGA4.byChannel.length > 0 && (
+              <table class="channel-table">
+                <thead>
+                  <tr>
+                    <th>Kanał</th>
+                    <th class="num">Sesje</th>
+                    <th class="num">Zaangażow.</th>
+                    <th class="num">Zdarzenia</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {mainGA4.byChannel.map((ch) => (
+                    <tr>
+                      <td>{ch.channel}</td>
+                      <td class="num">{ch.sessions.toLocaleString("pl-PL")}</td>
+                      <td class="num">{ch.engagedSessions.toLocaleString("pl-PL")}</td>
+                      <td class="num">{ch.keyEvents.toLocaleString("pl-PL")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <!-- KARTA: Top produkty -->
+          <div class="card">
+            <h2>Top produkty</h2>
+            {topProducts.length === 0 ? (
+              <p class="no-data">Brak danych o produktach w tym okresie.</p>
+            ) : (
+              <div>
+                {topProducts.map((p, i) => (
+                  <div class="product-row">
+                    <span class="product-rank">{i + 1}</span>
+                    <div style="min-width:0">
+                      <div class="product-name" title={p.productName}>{p.productName}</div>
+                      <div class="product-bar-wrap">
+                        <div class="product-bar"
+                             style={`width:${Math.round((p.value / topMax) * 100)}%`}></div>
+                      </div>
+                    </div>
+                    <span class="product-value">{formatPLNShort(p.value)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </>
+    )}
+  </div>
 </Layout>
