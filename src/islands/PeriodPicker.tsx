@@ -50,13 +50,18 @@ export default function PeriodPicker({
 
   function onTypeChange(newType: string) {
     setType(newType);
-    const now = new Date();
-    let newAnchor = "";
-    if (newType === "month") newAnchor = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    else if (newType === "quarter") newAnchor = `${now.getFullYear()}-Q${Math.ceil((now.getMonth() + 1) / 3)}`;
-    else if (newType === "year") newAnchor = String(now.getFullYear());
-    setAnchor(newAnchor);
-    go({ period: newType, anchor: newAnchor });
+    if (newType === "custom") {
+      setAnchor("");
+      go({ period: newType, anchor: null });
+    } else {
+      setAnchor("current");
+      go({ period: newType, anchor: "current" });
+    }
+  }
+
+  function onAnchorMode(mode: "current" | "last") {
+    setAnchor(mode);
+    go({ anchor: mode });
   }
 
   function onAnchorChange(val: string) {
@@ -94,15 +99,31 @@ export default function PeriodPicker({
         </select>
       </div>
 
-      {/* Kotwica */}
-      {type === "month" && (
+      {/* Toggle bieżący / ostatni zakończony */}
+      {type !== "custom" && (
+        <div className="period-group">
+          <div className="anchor-toggle">
+            <button
+              className={`anchor-btn${anchor === "current" ? " anchor-btn--active" : ""}`}
+              onClick={() => onAnchorMode("current")}
+            >Bieżący (do dziś)</button>
+            <button
+              className={`anchor-btn${anchor === "last" ? " anchor-btn--active" : ""}`}
+              onClick={() => onAnchorMode("last")}
+            >Ostatni zakończony</button>
+          </div>
+        </div>
+      )}
+
+      {/* Kotwica — konkretny okres (ukryta gdy toggle jest aktywny) */}
+      {type === "month" && anchor !== "current" && anchor !== "last" && (
         <div className="period-group">
           <label htmlFor="p-month">Miesiąc</label>
           <input id="p-month" type="month" value={anchor}
             onChange={(e) => onAnchorChange(e.target.value)} />
         </div>
       )}
-      {type === "quarter" && (
+      {type === "quarter" && anchor !== "current" && anchor !== "last" && (
         <div className="period-group">
           <label>Kwartał</label>
           <input type="number" value={qYear} min={2000} max={2100} style={{width:"5rem"}}
@@ -116,7 +137,7 @@ export default function PeriodPicker({
           </select>
         </div>
       )}
-      {type === "year" && (
+      {type === "year" && anchor !== "current" && anchor !== "last" && (
         <div className="period-group">
           <label htmlFor="p-year">Rok</label>
           <input id="p-year" type="number" value={anchor || String(new Date().getFullYear())}

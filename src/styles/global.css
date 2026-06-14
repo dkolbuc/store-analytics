@@ -132,6 +132,47 @@ code {
   letter-spacing: .05em;
 }
 
+/* ── Toggle bieżący / ostatni ── */
+.anchor-toggle {
+  display: inline-flex;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-s);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.anchor-btn {
+  padding: .28rem .65rem;
+  font-size: .78rem;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+  white-space: nowrap;
+}
+
+.anchor-btn + .anchor-btn {
+  border-left: 1px solid var(--border-2);
+}
+
+.anchor-btn:hover {
+  background: var(--accent-lt);
+  color: var(--accent);
+}
+
+.anchor-btn--active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.anchor-btn--active:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* ── Formanty HTML ── */
 select,
 input[type="month"],

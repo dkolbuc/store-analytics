@@ -4,7 +4,9 @@
  *
  * Parametry URL:
  *   period  = month | quarter | year | custom
- *   anchor  = YYYY-MM (month) | YYYY-Q1..Q4 (quarter) | YYYY (year)
+ *   anchor  = current | last | YYYY-MM (month) | YYYY-Q1..Q4 (quarter) | YYYY (year)
+ *             'current' = bieżący okres (period-to-date)
+ *             'last'    = ostatni zakończony pełny okres
  *   compare = previous | year | custom
  *   from, to             — tylko gdy period=custom
  *   compare_from, compare_to — tylko gdy compare=custom
@@ -150,27 +152,8 @@ export function parsePeriodParams(sp: URLSearchParams): PeriodParams {
     };
   }
 
-  // Dla month/quarter/year użyj podanej kotwicy lub wylicz poprzedni pełny okres
-  const today = todayWarsaw();
-  const [tYear, tMonth] = today.split("-").map(Number) as [number, number];
-
-  let anchor: string;
-  if (sp.has("anchor")) {
-    anchor = sp.get("anchor")!;
-  } else if (type === "month") {
-    // Domyślnie poprzedni miesiąc
-    const [py, pm] = shiftMonths(tYear, tMonth, -1);
-    anchor = `${py}-${String(pm).padStart(2, "0")}`;
-  } else if (type === "quarter") {
-    // Domyślnie poprzedni kwartał
-    const currentQ = monthToQuarter(tMonth);
-    const prevQ = currentQ === 1 ? 4 : currentQ - 1;
-    const prevQYear = currentQ === 1 ? tYear - 1 : tYear;
-    anchor = `${prevQYear}-Q${prevQ}`;
-  } else {
-    // year — domyślnie poprzedni rok
-    anchor = String(tYear - 1);
-  }
+  // Dla month/quarter/year użyj podanej kotwicy lub domyślnie 'current' (bieżący okres)
+  const anchor = sp.get("anchor") ?? "current";
 
   return { type, anchor, compare };
 }
@@ -202,20 +185,46 @@ export function resolvePeriods(
     return { main: params.customMain, compare };
   }
 
+  // Rozwiąż 'current' / 'last' na konkretną kotwicę datową
+  const [tYear, tMonth] = today.split("-").map(Number) as [number, number];
+  let anchor = params.anchor;
+  if (anchor === "current" || anchor === "last") {
+    const isCurrent = anchor === "current";
+    if (params.type === "month") {
+      if (isCurrent) {
+        anchor = `${tYear}-${String(tMonth).padStart(2, "0")}`;
+      } else {
+        const [py, pm] = shiftMonths(tYear, tMonth, -1);
+        anchor = `${py}-${String(pm).padStart(2, "0")}`;
+      }
+    } else if (params.type === "quarter") {
+      const cQ = monthToQuarter(tMonth);
+      if (isCurrent) {
+        anchor = `${tYear}-Q${cQ}`;
+      } else {
+        const pQ = cQ === 1 ? 4 : cQ - 1;
+        anchor = `${cQ === 1 ? tYear - 1 : tYear}-Q${pQ}`;
+      }
+    } else {
+      // year
+      anchor = isCurrent ? String(tYear) : String(tYear - 1);
+    }
+  }
+
   // --- Wyznacz pełny zakres główny ---
   let fullMain: DateRange;
   let prevPeriod: DateRange;
   let yearAgoPeriod: DateRange;
 
   if (params.type === "month") {
-    const [y, m] = params.anchor.split("-").map(Number) as [number, number];
+    const [y, m] = anchor.split("-").map(Number) as [number, number];
     fullMain = monthRange(y, m);
     const [py, pm] = shiftMonths(y, m, -1);
     prevPeriod = monthRange(py, pm);
     yearAgoPeriod = monthRange(y - 1, m);
   } else if (params.type === "quarter") {
     // anchor: 'YYYY-Q1' .. 'YYYY-Q4'
-    const [yearStr, qStr] = params.anchor.split("-Q");
+    const [yearStr, qStr] = anchor.split("-Q");
     const y = Number(yearStr);
     const q = Number(qStr);
     fullMain = quarterRange(y, q);
@@ -225,7 +234,7 @@ export function resolvePeriods(
     yearAgoPeriod = quarterRange(y - 1, q);
   } else {
     // year
-    const y = Number(params.anchor);
+    const y = Number(anchor);
     fullMain = yearRange(y);
     prevPeriod = yearRange(y - 1);
     yearAgoPeriod = yearRange(y - 2);
