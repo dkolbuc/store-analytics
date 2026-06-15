@@ -204,6 +204,9 @@ const topMax = topProducts[0]?.value ?? 1;
       compareFrom={params.customCompare?.start ?? ""}
       compareTo={params.customCompare?.end ?? ""}
     />
+    <form method="POST" action="/api/auth/logout" style="margin-left:auto;flex-shrink:0">
+      <button type="submit" class="logout-btn">Wyloguj</button>
+    </form>
   </div>
 
   <!-- Pasek kontekstu -->

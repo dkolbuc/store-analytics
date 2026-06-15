@@ -93,6 +93,25 @@ code {
   flex-shrink: 0;
 }
 
+/* ── Przycisk wylogowania ── */
+.logout-btn {
+  padding: .28rem .7rem;
+  font-family: inherit;
+  font-size: .78rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-s);
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.logout-btn:hover {
+  border-color: var(--negative);
+  color: var(--negative);
+}
+
 /* ── Selektor sklepu (wyspa React) ── */
 .shop-selector {
   display: flex;
