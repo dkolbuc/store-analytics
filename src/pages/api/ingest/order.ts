@@ -259,8 +259,23 @@ export const POST: APIRoute = async ({ request, locals }) => {
   if (!shop)        return jsonErr(404, "Sklep nie istnieje");
   if (!shop.active) return jsonErr(403, "Sklep nieaktywny");
 
-  // Surowe body odczytane raz — potrzebne do weryfikacji HMAC
+  // Surowe body odczytane raz — string potrzebny do HMAC i parsowania
   const rawBody = await request.text();
+
+  // Wstępne parsowanie przed auth — wyłącznie do wykrycia pingu
+  let rawParsed: unknown;
+  try {
+    rawParsed = JSON.parse(rawBody);
+  } catch {
+    return jsonErr(400, "Nieprawidłowy JSON");
+  }
+
+  // Ping walidacyjny WooCommerce: jest webhook_id, NIE ma id → odpowiedz 200 bez auth i zapisu.
+  // rawBody pozostaje niezmieniony — HMAC prawdziwych dostaw liczony na oryginalnym stringu.
+  const rawObj = rawParsed as Record<string, unknown>;
+  if ("webhook_id" in rawObj && !("id" in rawObj)) {
+    return jsonOk({ ok: true, ping: true });
+  }
 
   const wcSig      = request.headers.get("X-WC-Webhook-Signature");
   const customToken = request.headers.get("X-Custom-Token");
@@ -277,13 +292,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
     source = "custom";
   } else {
     return jsonErr(401, "Brak nagłówka uwierzytelniającego");
-  }
-
-  let rawParsed: unknown;
-  try {
-    rawParsed = JSON.parse(rawBody);
-  } catch {
-    return jsonErr(400, "Nieprawidłowy JSON");
   }
 
   // Typ zdarzenia
