@@ -262,7 +262,24 @@ export const POST: APIRoute = async ({ request, locals }) => {
   // Surowe body odczytane raz — string potrzebny do HMAC i parsowania
   const rawBody = await request.text();
 
-  // Wstępne parsowanie przed auth — wyłącznie do wykrycia pingu
+  // ---------------------------------------------------------------------------
+  // Ping walidacyjny WooCommerce — PRZED auth i zapisem
+  //
+  // Woo wysyła ping jako application/x-www-form-urlencoded z body "webhook_id=<n>",
+  // bez nagłówka X-WC-Webhook-Signature. Obsługujemy trzy warianty:
+  //   1. Content-Type zawiera application/x-www-form-urlencoded
+  //   2. body nie jest JSON-em, ale zawiera "webhook_id=" (form-encoded)
+  //   3. body jest JSON-em z polem webhook_id i bez pola id
+  // ---------------------------------------------------------------------------
+  const contentType = request.headers.get("Content-Type") ?? "";
+  const isFormEncoded = contentType.includes("application/x-www-form-urlencoded");
+
+  if (isFormEncoded || rawBody.includes("webhook_id=")) {
+    // Wariant form-encoded — body nie jest JSON-em zamówienia
+    return jsonOk({ ok: true, ping: true });
+  }
+
+  // Próba parsowania JSON — tylko dla właściwych dostaw (Content-Type: application/json)
   let rawParsed: unknown;
   try {
     rawParsed = JSON.parse(rawBody);
@@ -270,8 +287,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return jsonErr(400, "Nieprawidłowy JSON");
   }
 
-  // Ping walidacyjny WooCommerce: jest webhook_id, NIE ma id → odpowiedz 200 bez auth i zapisu.
-  // rawBody pozostaje niezmieniony — HMAC prawdziwych dostaw liczony na oryginalnym stringu.
+  // Wariant JSON z webhook_id i bez id (dodatkowe zabezpieczenie)
   const rawObj = rawParsed as Record<string, unknown>;
   if ("webhook_id" in rawObj && !("id" in rawObj)) {
     return jsonOk({ ok: true, ping: true });
