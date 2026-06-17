@@ -4,11 +4,10 @@ import react from "@astrojs/react";
 
 export default defineConfig({
   output: "server",
-  adapter: cloudflare({
-    // Włącza lokalny proxy dla bindings (D1, KV, itp.) podczas `astro dev`
   security: {
     checkOrigin: false,
-    },
+  },
+  adapter: cloudflare({
     platformProxy: {
       enabled: true,
       // Wskazuje na lokalne bindingi zdefiniowane w wrangler.toml
