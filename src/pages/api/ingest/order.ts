@@ -149,8 +149,8 @@ function sanitizeWooOrder(raw: unknown): SanitizedWooOrder {
       date:      isoToDate(String(r.date_created ?? "")),
     })),
     utm_source:   findMeta("_wc_order_attribution_utm_source"),
-    utm_medium:   findMeta("_utm_medium"),
-    utm_campaign: findMeta("_utm_campaign"),
+    utm_medium:   findMeta("_wc_order_attribution_utm_medium"),
+    utm_campaign: findMeta("_wc_order_attribution_utm_campaign"),
   };
 }
 
