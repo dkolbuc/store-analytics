@@ -20,9 +20,11 @@ import { deltaClass, fmtDelta, deltaArrow } from "../lib/delta.ts";
 import {
   querySales, queryAds, queryGA4, queryTopProducts,
   querySalesDaily, queryAdsDaily, queryGA4Daily,
+  queryAdsConversions, queryGA4Events,
   ZERO_SALES, ZERO_ADS, ZERO_GA4,
   type SalesMetrics, type AdsMetrics, type GA4Metrics,
   type DailyPoint, type DailyAdsPoint, type TopProduct,
+  type AdsConversionRow, type GA4EventRow,
 } from "../lib/queries.ts";
 
 // ---------------------------------------------------------------------------
@@ -88,6 +90,8 @@ let mainAdsDaily:    DailyAdsPoint[] = [];
 let cmpAdsDaily:     DailyAdsPoint[] = [];
 let mainGA4Daily:    DailyPoint[]    = [];
 let cmpGA4Daily:     DailyPoint[]    = [];
+let adsConversions:  AdsConversionRow[] = [];
+let ga4Events:       GA4EventRow[]      = [];
 
 if (selectedShopId) {
   try {
@@ -111,6 +115,15 @@ if (selectedShopId) {
     ]);
   } catch (e) {
     console.error("Błąd zapytań D1:", e);
+  }
+
+  try {
+    [adsConversions, ga4Events] = await Promise.all([
+      queryAdsConversions(db, selectedShopId, mainRange),
+      queryGA4Events(db, selectedShopId, mainRange),
+    ]);
+  } catch (e) {
+    console.error("Błąd zapytań konwersji/zdarzeń:", e);
   }
 }
 
@@ -222,6 +235,39 @@ function deltaSpan(key: string, change: number | null) {
 }
 
 const topMax = topProducts[0]?.value ?? 1;
+
+// ---------------------------------------------------------------------------
+// Grupowanie zdarzeń GA4
+// ---------------------------------------------------------------------------
+
+interface EventSummary {
+  eventName: string;
+  total: number;
+  byChannel: { channel: string; count: number }[];
+}
+
+const EVENT_GROUPS: Record<string, string[]> = {
+  "eCommerce": ["purchase", "add_to_cart", "begin_checkout", "view_item", "remove_from_cart", "view_cart", "add_payment_info", "add_shipping_info", "view_item_list"],
+  "Kontakt":   ["generate_lead", "contact", "form_submit", "submit_lead_form"],
+  "Ruch":      ["page_view", "scroll", "session_start", "user_engagement", "first_visit"],
+};
+
+const eventSummaryMap = new Map<string, EventSummary>();
+for (const row of ga4Events) {
+  if (!eventSummaryMap.has(row.eventName)) {
+    eventSummaryMap.set(row.eventName, { eventName: row.eventName, total: 0, byChannel: [] });
+  }
+  const ev = eventSummaryMap.get(row.eventName)!;
+  ev.total += row.eventCount;
+  ev.byChannel.push({ channel: row.channelGroup, count: row.eventCount });
+}
+
+const eventGroupsWithData = Object.entries(EVENT_GROUPS)
+  .map(([groupName, events]) => ({
+    groupName,
+    events: events.filter((name) => eventSummaryMap.has(name)).map((name) => eventSummaryMap.get(name)!),
+  }))
+  .filter((g) => g.events.length > 0);
 ---
 
 <Layout title={`${selectedShop?.name ?? "Dashboard"} — Store Analytics`}>
@@ -281,6 +327,13 @@ const topMax = topProducts[0]?.value ?? 1;
             metricKey="revenue"
           />
           <KPICard
+            label="Zamówienia"
+            current={String(mainSales.orders)}
+            compare={String(cmpSales.orders)}
+            change={dOrders}
+            metricKey="orders"
+          />
+          <KPICard
             label="Wydatki reklamowe"
             current={formatPLNShort(mainAds.cost)}
             compare={formatPLNShort(cmpAds.cost)}
@@ -293,13 +346,6 @@ const topMax = topProducts[0]?.value ?? 1;
             compare={formatROAS(cmpROAS)}
             change={dROAS}
             metricKey="roas"
-          />
-          <KPICard
-            label="Zamówienia"
-            current={String(mainSales.orders)}
-            compare={String(cmpSales.orders)}
-            change={dOrders}
-            metricKey="orders"
           />
         </div>
 
@@ -446,6 +492,29 @@ const topMax = topProducts[0]?.value ?? 1;
               mainRange={mainRange}
               compareRange={compareRange}
             />
+            {adsConversions.length > 0 && (
+              <div class="subsection">
+                <p class="subsection-label">Konwersje</p>
+                <table class="channel-table">
+                  <thead>
+                    <tr>
+                      <th>Akcja</th>
+                      <th class="num">Konwersje</th>
+                      <th class="num">Wartość</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {adsConversions.map((c) => (
+                      <tr>
+                        <td>{c.action}</td>
+                        <td class="num">{c.conversions.toFixed(0)}</td>
+                        <td class="num">{formatPLNShort(c.conversionsValue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <!-- KARTA: Ruch GA4 -->
@@ -509,6 +578,27 @@ const topMax = topProducts[0]?.value ?? 1;
                   ))}
                 </tbody>
               </table>
+            )}
+            {eventGroupsWithData.length > 0 && (
+              <div class="subsection">
+                <p class="subsection-label">Zdarzenia</p>
+                {eventGroupsWithData.map(({ groupName, events }) => (
+                  <div class="event-group">
+                    <p class="event-group__label">{groupName}</p>
+                    {events.map((ev) => (
+                      <div class="event-row">
+                        <span class="event-row__name">{ev.eventName}</span>
+                        <span class="event-row__total">{ev.total.toLocaleString("pl-PL")}</span>
+                        <span class="event-channels">
+                          {ev.byChannel.map((ch) => (
+                            <span class="event-channel">{ch.channel}: {ch.count.toLocaleString("pl-PL")}</span>
+                          ))}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 

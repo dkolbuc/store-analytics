@@ -237,6 +237,58 @@ export async function queryGA4Daily(
 }
 
 // ---------------------------------------------------------------------------
+// Konwersje Ads (fact_ads_conversions_daily)
+// ---------------------------------------------------------------------------
+
+export interface AdsConversionRow {
+  action: string;
+  conversions: number;
+  conversionsValue: number; // grosze
+}
+
+export async function queryAdsConversions(
+  db: DB, shopId: string, range: DateRange
+): Promise<AdsConversionRow[]> {
+  interface Row { action: string; conversions: number; conversionsValue: number; }
+  return dbAll<Row>(db,
+    `SELECT conversion_action       AS action,
+       SUM(conversions)             AS conversions,
+       COALESCE(SUM(conversions_value), 0) AS conversionsValue
+     FROM fact_ads_conversions_daily
+     WHERE shop_id = ? AND date BETWEEN ? AND ?
+     GROUP BY conversion_action
+     ORDER BY conversions DESC`,
+    [shopId, range.start, range.end]
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Zdarzenia GA4 (fact_ga4_events_daily)
+// ---------------------------------------------------------------------------
+
+export interface GA4EventRow {
+  eventName: string;
+  channelGroup: string;
+  eventCount: number;
+}
+
+export async function queryGA4Events(
+  db: DB, shopId: string, range: DateRange
+): Promise<GA4EventRow[]> {
+  interface Row { eventName: string; channelGroup: string; eventCount: number; }
+  return dbAll<Row>(db,
+    `SELECT event_name    AS eventName,
+       channel_group      AS channelGroup,
+       SUM(event_count)   AS eventCount
+     FROM fact_ga4_events_daily
+     WHERE shop_id = ? AND date BETWEEN ? AND ?
+     GROUP BY event_name, channel_group
+     ORDER BY event_name, eventCount DESC`,
+    [shopId, range.start, range.end]
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Top produkty
 // ---------------------------------------------------------------------------
 

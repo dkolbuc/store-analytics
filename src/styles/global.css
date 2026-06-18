@@ -629,6 +629,82 @@ input[type="date"]   { width: 8.5rem; }
 }
 
 /* ─────────────────────────────────────────────────
+   PODSEKCJE (Konwersje, Zdarzenia)
+───────────────────────────────────────────────── */
+.subsection {
+  margin-top: 1rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--border);
+}
+
+.subsection-label {
+  font-size: .67rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  margin-bottom: .5rem;
+}
+
+/* ─────────────────────────────────────────────────
+   SEKCJA ZDARZEŃ GA4
+───────────────────────────────────────────────── */
+.event-group {
+  margin-bottom: .75rem;
+}
+
+.event-group__label {
+  font-size: .67rem;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  margin-bottom: .3rem;
+}
+
+.event-row {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  padding: .2rem 0;
+  border-bottom: 1px solid var(--border);
+  font-size: .8rem;
+  flex-wrap: wrap;
+}
+
+.event-row:last-child { border-bottom: none; }
+
+.event-row__name {
+  flex: 0 0 12rem;
+  color: var(--text);
+}
+
+.event-row__total {
+  flex: 0 0 4rem;
+  text-align: right;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.event-channels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  flex: 1;
+}
+
+.event-channel {
+  font-size: .7rem;
+  color: var(--muted);
+  background: var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─────────────────────────────────────────────────
    STANY BRZEGOWE
 ───────────────────────────────────────────────── */
 .no-data {
