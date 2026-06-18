@@ -254,6 +254,17 @@ input[type="date"]   { width: 8.5rem; }
   flex-shrink: 0;
 }
 
+.badge-error {
+  font-size: .75rem;
+  font-weight: 500;
+  color: var(--negative);
+  background: var(--negative-bg);
+  border: 1px solid var(--negative);
+  border-radius: 4px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
 /* ─────────────────────────────────────────────────
    WRAPPER TREŚCI
 ───────────────────────────────────────────────── */

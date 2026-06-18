@@ -11,6 +11,7 @@ import Ga4Chart from "../islands/Ga4Chart";
 import { getDB, dbAll } from "../lib/db.ts";
 import {
   parsePeriodParams, resolvePeriods, todayWarsaw, formatPeriodLabel, percentChange,
+  type PeriodParams,
 } from "../lib/dates.ts";
 import { formatPLN, formatPLNShort, groszeToPLN } from "../lib/money.ts";
 import { calcROAS, formatROAS, calcCPC, calcCTR } from "../lib/roas.ts";
@@ -30,8 +31,21 @@ import {
 
 const db = getDB(Astro.locals);
 const today = todayWarsaw();
-const params = parsePeriodParams(Astro.url.searchParams);
-const { main: mainRange, compare: compareRange } = resolvePeriods(params, today);
+
+// Parsowanie i rozwiązywanie okresu opakowane w try/catch — błąd parametrów nie wywołuje 500
+const { params, mainRange, compareRange, periodError } = (() => {
+  try {
+    const p = parsePeriodParams(Astro.url.searchParams);
+    const { main, compare } = resolvePeriods(p, today);
+    return { params: p, mainRange: main, compareRange: compare, periodError: null as string | null };
+  } catch (err) {
+    console.error("[Okres] Błąd parsowania parametrów:", err);
+    const p: PeriodParams = { type: "month", anchor: "current", compare: "previous" };
+    const { main, compare } = resolvePeriods(p, today);
+    return { params: p, mainRange: main, compareRange: compare,
+             periodError: "Nieprawidłowe parametry okresu — wyświetlam bieżący miesiąc." };
+  }
+})();
 
 // Czy bieżący okres jest w toku (period-to-date)?
 const isInProgress = params.type !== "custom" && mainRange.end === today;
@@ -235,10 +249,15 @@ const topMax = topProducts[0]?.value ?? 1;
 
   <!-- Pasek kontekstu -->
   <div class="context-bar">
-    {isInProgress && <span class="badge-ptd">W toku</span>}
-    <span>{mainLabel}</span>
-    <span style="color:var(--border-2)">vs</span>
-    <span>{compareLabel}</span>
+    {periodError
+      ? <span class="badge-error">{periodError}</span>
+      : <>
+          {isInProgress && <span class="badge-ptd">W toku</span>}
+          <span>{mainLabel}</span>
+          <span style="color:var(--border-2)">vs</span>
+          <span>{compareLabel}</span>
+        </>
+    }
   </div>
 
   <!-- ──────────────────── Zawartość ──────────────────── -->

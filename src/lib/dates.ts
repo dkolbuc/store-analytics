@@ -66,6 +66,22 @@ function lastDayOfMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
+/** Przesuwa datę o podaną liczbę lat (z clampem na Feb 29 → Feb 28). */
+function addYears(date: string, years: number): string {
+  const [yStr, mStr, dStr] = date.split("-");
+  const newYear = Number(yStr) + years;
+  const month   = Number(mStr);
+  const day     = Math.min(Number(dStr), lastDayOfMonth(newYear, month));
+  return `${newYear}-${mStr}-${String(day).padStart(2, "0")}`;
+}
+
+/** Sprawdza czy string ma format YYYY-MM-DD i jest poprawną datą. */
+function isValidDate(s: string | null | undefined): s is string {
+  if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = parseDate(s);
+  return !isNaN(d.getTime());
+}
+
 /** Przesuwa rok+miesiąc o deltaMiesiące. Zwraca [rok, miesiąc]. */
 function shiftMonths(year: number, month: number, delta: number): [number, number] {
   const total = year * 12 + (month - 1) + delta;
@@ -137,18 +153,21 @@ export function parsePeriodParams(sp: URLSearchParams): PeriodParams {
   const compare = (sp.get("compare") ?? "previous") as CompareMode;
 
   if (type === "custom") {
+    const from   = sp.get("from");
+    const to     = sp.get("to");
+    const cmpFrom = sp.get("compare_from");
+    const cmpTo   = sp.get("compare_to");
+
+    // Akceptuj daty tylko gdy obie są poprawne i start <= end
+    const validMain    = isValidDate(from) && isValidDate(to) && from <= to;
+    const validCompare = isValidDate(cmpFrom) && isValidDate(cmpTo) && cmpFrom <= cmpTo;
+
     return {
       type: "custom",
       anchor: "",
       compare,
-      customMain:
-        sp.get("from") && sp.get("to")
-          ? { start: sp.get("from")!, end: sp.get("to")! }
-          : undefined,
-      customCompare:
-        compare === "custom" && sp.get("compare_from") && sp.get("compare_to")
-          ? { start: sp.get("compare_from")!, end: sp.get("compare_to")! }
-          : undefined,
+      customMain:    validMain    ? { start: from,    end: to    } : undefined,
+      customCompare: validCompare ? { start: cmpFrom, end: cmpTo } : undefined,
     };
   }
 
@@ -176,13 +195,41 @@ export function resolvePeriods(
   today: string = todayWarsaw()
 ): ResolvedPeriods {
   if (params.type === "custom") {
-    if (!params.customMain)
-      throw new Error("Brak customMain dla period=custom");
-    const compare =
-      params.compare === "custom"
-        ? params.customCompare ?? params.customMain
-        : params.customMain; // fallback — caller powinien podać
-    return { main: params.customMain, compare };
+    // Brak / niepoprawne daty głównego okresu → bezpieczny fallback (bieżący miesiąc PTD)
+    if (!params.customMain) {
+      const [tYr, tMo] = today.split("-").map(Number) as [number, number];
+      const mainFb: DateRange = {
+        start: `${tYr}-${String(tMo).padStart(2, "0")}-01`,
+        end:   today,
+      };
+      const elapsed = spanDays(mainFb.start, today) - 1;
+      const [py, pm] = shiftMonths(tYr, tMo, -1);
+      const cmpStart = `${py}-${String(pm).padStart(2, "0")}-01`;
+      return { main: mainFb, compare: { start: cmpStart, end: addDays(cmpStart, elapsed) } };
+    }
+
+    const main = params.customMain;
+    // offset = liczba dni w głównym okresie minus 1 (do obliczenia granic porównania)
+    const len = spanDays(main.start, main.end) - 1;
+
+    let compare: DateRange;
+    if (params.compare === "custom" && params.customCompare) {
+      // Użytkownik podał własny zakres porównawczy
+      compare = params.customCompare;
+    } else if (params.compare === "custom") {
+      // Własny tryb, ale brak dat porównania → poprzedni okres tej samej długości
+      const cmpEnd   = addDays(main.start, -1);
+      compare = { start: addDays(cmpEnd, -len), end: cmpEnd };
+    } else if (params.compare === "year") {
+      // Ten sam zakres rok wcześniej
+      compare = { start: addYears(main.start, -1), end: addYears(main.end, -1) };
+    } else {
+      // "previous" — poprzedni okres tej samej długości, kończący się dzień przed main
+      const cmpEnd   = addDays(main.start, -1);
+      compare = { start: addDays(cmpEnd, -len), end: cmpEnd };
+    }
+
+    return { main, compare };
   }
 
   // Rozwiąż 'current' / 'last' na konkretną kotwicę datową
