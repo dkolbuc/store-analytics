@@ -1,6 +1,15 @@
 ---
-interface Props { summary: string | null; }
-const { summary } = Astro.props;
+interface Props {
+  summary: string | null;
+  status: "ok" | "no-key" | "no-data" | "error";
+}
+const { summary, status } = Astro.props;
+
+const EMPTY_MESSAGES: Record<string, string> = {
+  "no-key":  "Klucz GEMINI_API_KEY nie skonfigurowany.",
+  "no-data": "Brak danych w wybranym okresie.",
+  "error":   "Podsumowanie chwilowo niedostępne.",
+};
 ---
 
 <div class="ai-summary">
@@ -10,6 +19,6 @@ const { summary } = Astro.props;
   </div>
   {summary
     ? <p class="ai-summary__content">{summary}</p>
-    : <p class="ai-summary__empty">Brak danych lub klucz GEMINI_API_KEY nie skonfigurowany.</p>
+    : <p class="ai-summary__empty">{EMPTY_MESSAGES[status] ?? ""}</p>
   }
 </div>

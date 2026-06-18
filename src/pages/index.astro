@@ -14,7 +14,7 @@ import {
 } from "../lib/dates.ts";
 import { formatPLN, formatPLNShort, groszeToPLN } from "../lib/money.ts";
 import { calcROAS, formatROAS, calcCPC, calcCTR } from "../lib/roas.ts";
-import { getOrGenerateSummary } from "../lib/gemini.ts";
+import { getOrGenerateSummary, type SummaryInput } from "../lib/gemini.ts";
 import { deltaClass, fmtDelta, deltaArrow } from "../lib/delta.ts";
 import {
   querySales, queryAds, queryGA4, queryTopProducts,
@@ -138,33 +138,57 @@ const cmpAdsPLN:  DailyAdsPoint[] = cmpAdsDaily.map((d)   => ({ date: d.date, co
 // 6. Podsumowanie AI (graceful degradation)
 // ---------------------------------------------------------------------------
 
+// Klucz czytany z runtime env Cloudflare (jak w endpointach ingestu — nie import.meta.env)
+const apiKey = Astro.locals.runtime.env.GEMINI_API_KEY;
+
+// Trzy rozłączne stany: brak klucza / brak danych / błąd API / ok
+type AiStatus = "ok" | "no-key" | "no-data" | "error";
 let aiSummary: string | null = null;
-try {
-  const apiKey = Astro.locals.runtime.env.GEMINI_API_KEY;
-  if (apiKey && selectedShopId && selectedShop) {
-    aiSummary = await getOrGenerateSummary(db, {
-      shopId:       selectedShopId,
-      shopName:     selectedShop.name,
-      mainRange,
-      compareRange,
-      dataVersion:  selectedShop.data_version,
-      metrics: {
-        revenue:              mainSales.revenue,
-        orders:               mainSales.orders,
-        refundAmount:         mainSales.refunds,
-        adsCost:              mainAds.cost,
-        adsConversionsValue:  mainAds.conversionsValue,
-        sessions:             mainGA4.sessions,
-        prevRevenue:          cmpSales.revenue,
-        prevOrders:           cmpSales.orders,
-        prevRefundAmount:     cmpSales.refunds,
-        prevAdsCost:          cmpAds.cost,
-        prevAdsConversionsValue: cmpAds.conversionsValue,
-        prevSessions:         cmpGA4.sessions,
-      },
-    }, apiKey);
+let aiStatus: AiStatus = "ok";
+
+const hasData = mainSales.orders > 0 || mainSales.revenue > 0 || mainGA4.sessions > 0;
+
+if (!apiKey) {
+  aiStatus = "no-key";
+} else if (!hasData) {
+  aiStatus = "no-data";
+} else if (selectedShopId && selectedShop) {
+  const summaryInput: SummaryInput = {
+    shopId:       selectedShopId,
+    shopName:     selectedShop.name,
+    mainRange,
+    compareRange,
+    dataVersion:  selectedShop.data_version,
+    metrics: {
+      revenue:                 mainSales.revenue,
+      orders:                  mainSales.orders,
+      refundAmount:            mainSales.refunds,
+      adsCost:                 mainAds.cost,
+      adsConversionsValue:     mainAds.conversionsValue,
+      sessions:                mainGA4.sessions,
+      prevRevenue:             cmpSales.revenue,
+      prevOrders:              cmpSales.orders,
+      prevRefundAmount:        cmpSales.refunds,
+      prevAdsCost:             cmpAds.cost,
+      prevAdsConversionsValue: cmpAds.conversionsValue,
+      prevSessions:            cmpGA4.sessions,
+    },
+  };
+
+  // Jeden retry przy błędzie API (timeout, limit, sieć)
+  const attempt = () => getOrGenerateSummary(db, summaryInput, apiKey);
+  try {
+    aiSummary = await attempt();
+  } catch (err) {
+    console.error("[AI] Gemini błąd (próba 1):", err);
+    try {
+      aiSummary = await attempt();
+    } catch (err2) {
+      console.error("[AI] Gemini błąd (próba 2):", err2);
+      aiStatus = "error";
+    }
   }
-} catch { /* cicha degradacja */ }
+}
 
 // ---------------------------------------------------------------------------
 // Pomocnicy wyświetlania
@@ -261,7 +285,7 @@ const topMax = topProducts[0]?.value ?? 1;
         </div>
 
         <!-- ── Podsumowanie AI ── -->
-        <AISummary summary={aiSummary} />
+        <AISummary summary={aiSummary} status={aiStatus} />
 
         <!-- ── Siatka kart ── -->
         <div class="cards-grid">
