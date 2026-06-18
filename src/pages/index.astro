@@ -118,12 +118,20 @@ if (selectedShopId) {
   }
 
   try {
-    [adsConversions, ga4Events] = await Promise.all([
-      queryAdsConversions(db, selectedShopId, mainRange),
-      queryGA4Events(db, selectedShopId, mainRange),
-    ]);
+    adsConversions = await queryAdsConversions(db, selectedShopId, mainRange);
   } catch (e) {
-    console.error("Błąd zapytań konwersji/zdarzeń:", e);
+    console.error("Błąd zapytania konwersji Ads:", e);
+  }
+  try {
+    ga4Events = await queryGA4Events(db, selectedShopId, mainRange);
+    if (ga4Events.length > 0) {
+      const names = [...new Set(ga4Events.map((r) => r.eventName))].join(", ");
+      console.log(`[GA4 events] ${ga4Events.length} wierszy, zdarzenia: ${names}`);
+    } else {
+      console.warn("[GA4 events] zapytanie OK, ale 0 wierszy — sprawdź shop_id i zakres dat");
+    }
+  } catch (e) {
+    console.error("Błąd zapytania zdarzeń GA4:", e);
   }
 }
 
@@ -247,9 +255,9 @@ interface EventSummary {
 }
 
 const EVENT_GROUPS: Record<string, string[]> = {
-  "eCommerce": ["purchase", "add_to_cart", "begin_checkout", "view_item", "remove_from_cart", "view_cart", "add_payment_info", "add_shipping_info", "view_item_list"],
-  "Kontakt":   ["generate_lead", "contact", "form_submit", "submit_lead_form"],
-  "Ruch":      ["page_view", "scroll", "session_start", "user_engagement", "first_visit"],
+  "eCommerce": ["view_item", "add_to_cart", "begin_checkout", "purchase"],
+  "Kontakt":   ["click_tel", "click_mail", "form_submit"],
+  "Ruch":      ["page_view"],
 };
 
 const eventSummaryMap = new Map<string, EventSummary>();
